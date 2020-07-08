@@ -1,5 +1,6 @@
 package com.ovozz.domain;
 
+import com.alibaba.fastjson.JSON;
 import com.aliyuncs.DefaultAcsClient;
 import com.aliyuncs.IAcsClient;
 import com.aliyuncs.alidns.model.v20150109.*;
@@ -8,6 +9,7 @@ import com.aliyuncs.exceptions.ServerException;
 import com.aliyuncs.profile.DefaultProfile;
 import com.ovozz.domain.utils.GetPublicIP;
 import com.ovozz.domain.utils.PropertiesUtil;
+import org.apache.log4j.Logger;
 
 public class ApplicationStartup {
 
@@ -23,15 +25,16 @@ public class ApplicationStartup {
     //执行周期 单位毫秒 10分钟/次
     private static Long executionCycleTimeLong = 1000 * 60 * 10l;
 
+    private static Logger log = Logger.getLogger(ApplicationStartup.class.getName());
 
-    public static void loadProperties(){
+    public static void loadProperties() {
         accessID = PropertiesUtil.getPropery("AccessID");
         accesskey = PropertiesUtil.getPropery("Accesskey");
         domainName = PropertiesUtil.getPropery("DomainName");
         RR = PropertiesUtil.getPropery("RR");
         getIpUrl = PropertiesUtil.getPropery("getIpUrl");
         executionCycleTimeLong = Long.valueOf(PropertiesUtil.getPropery("executionCycleTimeLong"));
-        System.out.println("conf.properties文件读取成功");
+        log.info("conf.properties文件读取成功");
     }
 
     public static void main(String[] args) throws Exception {
@@ -41,38 +44,37 @@ public class ApplicationStartup {
                 accessID,
                 accesskey);
         IAcsClient client = new DefaultAcsClient(profile);
-        System.out.println("--阿里云API接口连接对象初始化成功--");
+        log.info("--阿里云API接口连接对象初始化成功--");
         //加载配置文件
         loadProperties();
         GetPublicIP.URL = getIpUrl;
-        while (true){
-
-            try{
+        while (true) {
+            log.info("#############start#############\n");
+            try {
                 //获取本机公网ip
                 String ip = null;
-                try{
+                try {
                     ip = GetPublicIP.getWebIp();
-                }catch (Exception e){
-                    System.out.println("主机名：" + GetPublicIP.getHostName());
-                    System.out.println("内网ip：" + GetPublicIP.getIp());
-                    System.out.println("本机ip获取失败,将在10秒后重试.......");
-                    System.err.println("异常原因：" + e.getMessage());
+                } catch (Exception e) {
+                    log.error("本机ip获取失败,将在10秒后重试......." + "\n异常原因：" + e.getMessage());
                     Thread.sleep(1000 * 10);
                     continue;
                 }
-                System.out.print("主机名：" + GetPublicIP.getHostName());
-                System.out.print("\t内网ip：" + GetPublicIP.getIp());
-                System.out.println("\t公网ip：" + ip);
+                log.info("主机名：" + GetPublicIP.getHostName() +
+                        "\t内网ip：" + GetPublicIP.getIp() +
+                        "\t公网ip：" + ip);
 
                 //调用DescribeDomainRecords根据传入参数获取指定主域名的所有解析记录列表
                 DescribeDomainRecordsResponse.Record record = null;
                 DescribeDomainRecordsRequest queryRequest = new DescribeDomainRecordsRequest();
                 queryRequest.setDomainName(domainName);
                 DescribeDomainRecordsResponse queryResponse = client.getAcsResponse(queryRequest);
+
+                log.debug(JSON.toJSONString(queryResponse));
                 //找到指定的主机记录
-                for (DescribeDomainRecordsResponse.Record r :queryResponse.getDomainRecords()) {
-                    if(r.getRR().equals(RR)){
-                        System.out.println("查询指定解析记录成功！");
+                for (DescribeDomainRecordsResponse.Record r : queryResponse.getDomainRecords()) {
+                    if (r.getRR().equals(RR)) {
+                        log.info("查询指定解析记录成功！");
                         record = r;
                         break;
                     }
@@ -85,21 +87,24 @@ public class ApplicationStartup {
                 request.setType(record.getType());
                 request.setValue(ip);
 
-                if(request.getValue().equals(record.getValue())){
-                    System.out.println("当前ip与阿里云解析ip一致，无需修改，1分钟后再次查询");
+                if (request.getValue().equals(record.getValue())) {
+                    log.info("当前ip与阿里云解析ip一致，无需修改，休眠1分钟后再次查询");
                     Thread.sleep(1000 * 60 * 1);
                     continue;
                 }
                 UpdateDomainRecordResponse response = client.getAcsResponse(request);
-                System.out.println("修改解析成功 ip:" + request.getValue() + "recordId:" + response.getRecordId());
+                log.info("修改解析响应结果:" + JSON.toJSONString(response));
+                log.info("修改解析成功 ip:" + request.getValue());
             } catch (ServerException e) {
                 e.printStackTrace();
             } catch (ClientException e) {
-                System.err.println("ErrMsg:" + e.getErrMsg());
-            }catch (Exception e){
+                log.error("ErrMsg:" + e.getErrMsg());
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             //10分钟获取获取一次当前主机的公网ip并使用阿里云的域名进行解析该ip
+            log.info("程序休眠10分钟......");
+            log.info("#############end#############\n");
             Thread.sleep(executionCycleTimeLong);
         }
     }
