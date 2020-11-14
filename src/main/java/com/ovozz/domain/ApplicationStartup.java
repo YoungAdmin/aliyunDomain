@@ -14,12 +14,12 @@ import org.apache.log4j.Logger;
 public class ApplicationStartup {
 
     //#阿里云给你的id和key
-    private static String accessID = "LTAI4GDkXLQZAjtcTjdK9SJE";
-    private static String accesskey = "EZxxujbgiLhbusGFNE5GhxmX40Ylh3";
+    private static String accessID = "";
+    private static String accesskey = "";
     //域名名称
     private static String domainName = "ovozz.com";
     //主机记录。如果要解析@.exmaple.com，主机记录要填写”@”，而不是空。
-    private static String RR = "domain";
+    private static String RR = "";
     //获取外网ip服务器地址
     private static String getIpUrl = "http://myip.dnsomatic.com/";
     //执行周期 单位毫秒 10分钟/次
